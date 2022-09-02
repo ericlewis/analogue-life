@@ -485,7 +485,7 @@ always @(posedge conway_clk) begin
    r2p1 <= r2p2; r2p2 <= pixel_out_row2;
    r3p1 <= r3p2; r3p2 <= pixel_out_fifo;
 
-   output_pixel <= r2p2;
+   output_pixel <= (neighbor_count | r2p2) == 4'd3;
    fb_pixel <= {8{output_pixel}};
 end
 
@@ -585,7 +585,9 @@ always @(posedge clk_core_12288 or negedge reset_n) begin
                 // data enable. this is the active region of the line
                 vidout_de <= 1;
                 
-                vidout_rgb <= fb_pixel;
+                vidout_rgb[23:16] <= fb_pixel;
+                vidout_rgb[15:8]  <= fb_pixel;
+                vidout_rgb[7:0]   <= fb_pixel;
                 
             end 
         end
