@@ -1,7 +1,24 @@
 {
     "interact": {
         "magic": "APF_VER_1",
-        "variables": [],
+        "variables": [
+            {
+                "name": "Generation Speed",
+                "id": 1,
+                "type": "slider_u32",
+                "enabled": true,
+                "persist": true,
+                "address": "0x00100000",
+                "defaultval": 1,
+                "graphical": {
+                  "signed": false,
+                  "min": 1,
+                  "max": 10,
+                  "adjust_small": 1,
+                  "adjust_large": 1
+                }
+            }
+        ],
         "messages": []
     }
 }

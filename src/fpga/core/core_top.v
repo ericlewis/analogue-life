@@ -311,20 +311,27 @@ assign vpll_feed = 1'bZ;
 // add your own devices here
 always @(*) begin
     casex(bridge_addr)
-    default: begin
-        bridge_rd_data <= 0;
-    end
-    32'h10xxxxxx: begin
-        // example
-        // bridge_rd_data <= example_device_data;
-        bridge_rd_data <= 0;
-    end
-    32'hF8xxxxxx: begin
-        bridge_rd_data <= cmd_bridge_rd_data;
-    end
+        32'h00100000: begin
+		    bridge_rd_data <= gen_speed;
+	    end
+        32'hF8xxxxxx: begin
+            bridge_rd_data <= cmd_bridge_rd_data;
+        end
+        default: begin
+		    bridge_rd_data <= 0;
+	    end
     endcase
 end
 
+always @(posedge clk_74a) begin
+	if(bridge_wr) begin
+        casex(bridge_addr)
+            32'h00100000: begin
+			    gen_speed <= bridge_wr_data;
+		    end
+        endcase
+    end
+end
 
 //
 // host/target command handler
@@ -438,34 +445,37 @@ core_bridge_cmd icb (
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+reg  [31:0]	gen_speed = 1;
+wire [31:0]	gen_speed_s;
 
+synch_3 #(.WIDTH(32)) s1(gen_speed, gen_speed_s, video_rgb_clock);
+
+life life_instance(
+    .clock_74(clk_74a),
+    .reset_n(reset_n),
+    .x(visible_x),
+    .y(visible_y),
+    .r(video_rgb[23:16]),
+    .g(video_rgb[15:8]),
+    .b(video_rgb[7:0]),
+    .gen_speed(gen_speed_s),
+);
 
 // video generation
-// ~12,288,000 hz pixel clock
-//
-// we want our video mode of 320x240 @ 60hz, this results in 204800 clocks per frame
-// we need to add hblank and vblank times to this, so there will be a nondisplay area. 
-// it can be thought of as a border around the visible area.
-// to make numbers simple, we can have 400 total clocks per line, and 320 visible.
-// dividing 204800 by 400 results in 512 total lines per frame, and 240 visible.
-// this pixel clock is fairly high for the relatively low resolution, but that's fine.
-// PLL output has a minimum output frequency anyway.
 
-
-assign video_rgb_clock = clk_core_12288;
-assign video_rgb_clock_90 = clk_core_12288_90deg;
-assign video_rgb = vidout_rgb;
+assign video_rgb_clock = clk_core_23_75;
+assign video_rgb_clock_90 = clk_core_23_75_90deg;
 assign video_de = vidout_de;
 assign video_skip = vidout_skip;
 assign video_vs = vidout_vs;
 assign video_hs = vidout_hs;
 
-    localparam  VID_V_BPORCH = 'd10;
-    localparam  VID_V_ACTIVE = 'd240;
-    localparam  VID_V_TOTAL = 'd512;
-    localparam  VID_H_BPORCH = 'd10;
-    localparam  VID_H_ACTIVE = 'd320;
-    localparam  VID_H_TOTAL = 'd400;
+    localparam  VID_V_BPORCH = 'd20;
+    localparam  VID_V_ACTIVE = 'd480;
+    localparam  VID_V_TOTAL = 'd500;
+    localparam  VID_H_BPORCH = 'd160;
+    localparam  VID_H_ACTIVE = 'd640;
+    localparam  VID_H_TOTAL = 'd800;
 
     reg [15:0]  frame_count;
     
@@ -481,10 +491,7 @@ assign video_hs = vidout_hs;
     reg         vidout_vs;
     reg         vidout_hs, vidout_hs_1;
     
-    reg [9:0]   square_x = 'd135;
-    reg [9:0]   square_y = 'd95;
-
-always @(posedge clk_core_12288 or negedge reset_n) begin
+always @(posedge clk_core_23_75 or negedge reset_n) begin
 
     if(~reset_n) begin
     
@@ -534,18 +541,10 @@ always @(posedge clk_core_12288 or negedge reset_n) begin
             if(y_count >= VID_V_BPORCH && y_count < VID_V_ACTIVE+VID_V_BPORCH) begin
                 // data enable. this is the active region of the line
                 vidout_de <= 1;
-                
-                vidout_rgb[23:16] <= 8'd60;
-                vidout_rgb[15:8]  <= 8'd60;
-                vidout_rgb[7:0]   <= 8'd60;
-                
             end 
         end
     end
 end
-
-
-
 
 //
 // audio i2s silence generator
@@ -597,8 +596,8 @@ end
 ///////////////////////////////////////////////
 
 
-    wire    clk_core_12288;
-    wire    clk_core_12288_90deg;
+    wire    clk_core_23_75;
+    wire    clk_core_23_75_90deg;
     
     wire    pll_core_locked;
     
@@ -606,12 +605,242 @@ mf_pllbase mp1 (
     .refclk         ( clk_74a ),
     .rst            ( 0 ),
     
-    .outclk_0       ( clk_core_12288 ),
-    .outclk_1       ( clk_core_12288_90deg ),
+    .outclk_0       ( clk_core_23_75 ),
+    .outclk_1       ( clk_core_23_75_90deg ),
     
     .locked         ( pll_core_locked )
 );
 
+endmodule
 
+module life(clock_74, reset_n, x, y, r, g, b, gen_speed);
+    input clock_74;
+    input reset_n;
+    input  [9:0] x, y;
+    output [9:0] r, g, b;
+    input  [31:0] gen_speed;
+
+    wire [0:64*48-1] cells;
+    wire [0:64*48-1] cells_reset_state;
+    reg [0:64*48-1] cells_preset;
+
+    reg [3:0] preset_state;
+
+    initial begin
+        cells_preset[0    :64*0+63 ] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*1 :64*1+63 ] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*2 :64*2+63 ] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*3 :64*3+63 ] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*4 :64*4+63 ] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*5 :64*5+63 ] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*6 :64*6+63 ] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*7 :64*7+63 ] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*8 :64*8+63 ] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*9 :64*9+63 ] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*10:64*10+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*11:64*11+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*12:64*12+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*13:64*13+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*14:64*14+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*15:64*15+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*16:64*16+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*17:64*17+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*18:64*18+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*19:64*19+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*20:64*20+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*21:64*21+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*22:64*22+63] <= 64'b0000000000000000000000000000001100100000000000000000000000000000;
+        cells_preset[64*23:64*23+63] <= 64'b0000000000000000000000000000001000100000000000000000000000000000;
+        cells_preset[64*24:64*24+63] <= 64'b0000000000000000000000000000001001100000000000000000000000000000;
+        cells_preset[64*25:64*25+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*26:64*26+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*27:64*27+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*28:64*28+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*29:64*29+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*30:64*30+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*31:64*31+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*32:64*32+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*33:64*33+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*34:64*34+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*35:64*35+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*36:64*36+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*37:64*37+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*38:64*38+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*39:64*39+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*40:64*40+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*41:64*41+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*42:64*42+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*43:64*43+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*44:64*44+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*45:64*45+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*46:64*46+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+        cells_preset[64*47:64*47+63] <= 64'b0000000000000000000000000000000000000000000000000000000000000000;
+
+        preset_state <= 2;
+    end
+
+    assign cells_reset_state = cells_preset;
+
+    wire clk;
+    clock(clk, clock_74, gen_speed);
+
+    genvar i;
+    generate
+        for (i = 0; i < 64 * 48; i = i + 1) begin : CELLS
+            wire [7:0] neighbours;
+            if (i == 0) begin
+                assign neighbours[0] = cells[64*48 - 1];
+                assign neighbours[1] = cells[64*48 - 64];
+                assign neighbours[2] = cells[64*48 - 64 + 1];
+                assign neighbours[3] = cells[i     + 64 - 1];
+                assign neighbours[4] = cells[i     + 1];
+                assign neighbours[5] = cells[64    + 64 - 1];
+                assign neighbours[6] = cells[64];
+                assign neighbours[7] = cells[64    + 1];
+            end else if (i == 63) begin
+                assign neighbours[0] = cells[64*48 - 1 - 1];
+                assign neighbours[1] = cells[64*48 - 1];
+                assign neighbours[2] = cells[64*48 - 64];
+                assign neighbours[3] = cells[i     - 1];
+                assign neighbours[4] = cells[0];
+                assign neighbours[5] = cells[i     + 64 - 1];
+                assign neighbours[6] = cells[i     + 64];
+                assign neighbours[7] = cells[i     + 1];
+            end else if (i == 64*48 - 64) begin
+                assign neighbours[0] = cells[i - 1];
+                assign neighbours[1] = cells[i - 64];
+                assign neighbours[2] = cells[i - 64 + 1];
+                assign neighbours[3] = cells[i + 64 - 1];
+                assign neighbours[4] = cells[i + 1];
+                assign neighbours[5] = cells[0 + 64 - 1];
+                assign neighbours[6] = cells[0];
+                assign neighbours[7] = cells[0 + 1];
+            end else if (i == 64*48 - 1) begin
+                assign neighbours[0] = cells[i - 64 - 1];
+                assign neighbours[1] = cells[i - 64];
+                assign neighbours[2] = cells[i - 64 - 64 + 1];
+                assign neighbours[3] = cells[i - 1];
+                assign neighbours[4] = cells[i - 64 + 1];
+                assign neighbours[5] = cells[0 + 64 - 1 - 1];
+                assign neighbours[6] = cells[0 + 64 - 1];
+                assign neighbours[7] = cells[0];
+            end else if (i < 63) begin
+                assign neighbours[0] = cells[64*48 - 64 + i - 1];
+                assign neighbours[1] = cells[64*48 - 64 + i];
+                assign neighbours[2] = cells[64*48 - 64 + i + 1];
+                assign neighbours[3] = cells[i - 1];
+                assign neighbours[4] = cells[i + 1];
+                assign neighbours[5] = cells[i + 64 - 1];
+                assign neighbours[6] = cells[i + 64];
+                assign neighbours[7] = cells[i + 64 + 1];
+            end else if (i > 64*48 - 64) begin
+                assign neighbours[0] = cells[i - 64 - 1];
+                assign neighbours[1] = cells[i - 64];
+                assign neighbours[2] = cells[i - 64 + 1];
+                assign neighbours[3] = cells[i - 1];
+                assign neighbours[4] = cells[i + 1];
+                assign neighbours[5] = cells[0 + i - 1];
+                assign neighbours[6] = cells[0 + i];
+                assign neighbours[7] = cells[0 + i + 1];
+            end else if (i % 64 == 0) begin
+                assign neighbours[0] = cells[i - 1];
+                assign neighbours[1] = cells[i - 64];
+                assign neighbours[2] = cells[i - 64 + 1];
+                assign neighbours[3] = cells[i + 64 - 1];
+                assign neighbours[4] = cells[i + 1];
+                assign neighbours[5] = cells[i + 64 + 64 - 1];
+                assign neighbours[6] = cells[i + 64];
+                assign neighbours[7] = cells[i + 64 + 1];
+            end else if ((i + 1) % 64 == 0) begin
+                assign neighbours[0] = cells[i - 64 - 1];
+                assign neighbours[1] = cells[i - 64];
+                assign neighbours[2] = cells[i - 64 - 64 + 1];
+                assign neighbours[3] = cells[i - 1];
+                assign neighbours[4] = cells[i - 64 + 1];
+                assign neighbours[5] = cells[i + 64 - 1];
+                assign neighbours[6] = cells[i + 64];
+                assign neighbours[7] = cells[i + 1];
+            end else begin
+                assign neighbours[0] = cells[i - 64 - 1];
+                assign neighbours[1] = cells[i - 64];
+                assign neighbours[2] = cells[i - 64 + 1];
+                assign neighbours[3] = cells[i - 1];
+                assign neighbours[4] = cells[i + 1];
+                assign neighbours[5] = cells[i + 64 - 1];
+                assign neighbours[6] = cells[i + 64];
+                assign neighbours[7] = cells[i + 64 + 1];
+            end
+
+            life_cell(neighbours, clk, reset_n, cells_reset_state[i], cells[i]);
+
+        end
+    endgenerate
+
+    draw(cells, x, y, r, g, b);
+
+endmodule
+
+module clock(clk, clock_74, gen_speed);
+        input clock_74;
+        output clk;
+        input [31:0] gen_speed;
+        reg   [31:0] counter;
+        
+        always @(posedge clock_74) begin
+            if (counter == 25000000)
+                counter <= 0;
+            else
+                counter <= counter + gen_speed;
+        end
+        assign clk = (counter == 25000000);
+endmodule
+
+module life_cell(neighbours, clk, reset_n, initial_state, state);
+    input [7:0] neighbours;
+    input clk;
+    input reset_n;
+    input initial_state;
+    output reg state;
+ 
+    wire [3:0] population;
+    wire next_state;
+
+    assign population = neighbours[7] + 
+                        neighbours[6] +
+                        neighbours[5] +
+                        neighbours[4] +
+                        neighbours[3] +
+                        neighbours[2] +
+                        neighbours[1] +
+                        neighbours[0];
     
+    assign next_state = (population == 2 & state) | population == 3;
+ 
+    always @(posedge clk or negedge reset_n) begin
+        if (~reset_n) begin
+            state = initial_state;
+        end else begin
+            state = next_state;
+        end
+    end
+endmodule
+
+module draw(cells, x, y, r, g, b);
+    input [0:64*48-1] cells;
+    input [9:0] x, y;
+    output [9:0] r, g, b;
+
+    reg [29:0] RGB;
+    always @(x or y) begin
+        if (cells[(y / 10) * 64 + (x / 10)]) begin
+            RGB = 30'b111111111111111111111111111111;
+        end else begin
+            RGB = 30'b000000000000000000000000000000;
+        end
+    end
+
+    assign r = RGB[29:20];
+    assign g = RGB[19:10];
+    assign b = RGB[9:0];
+
 endmodule
