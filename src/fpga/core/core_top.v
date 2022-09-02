@@ -502,7 +502,6 @@ reg [7:0] fb_pixel;
 // this pixel clock is fairly high for the relatively low resolution, but that's fine.
 // PLL output has a minimum output frequency anyway.
 
-
 assign video_rgb_clock = clk_core_12288;
 assign video_rgb_clock_90 = clk_core_12288_90deg;
 assign video_rgb = vidout_rgb;
@@ -586,9 +585,9 @@ always @(posedge clk_core_12288 or negedge reset_n) begin
                 // data enable. this is the active region of the line
                 vidout_de <= 1;
                 
-                vidout_rgb[23:16] <= 8'd60;
-                vidout_rgb[15:8]  <= 8'd60;
-                vidout_rgb[7:0]   <= 8'd60;
+                vidout_rgb[23:16] <= fb_pixel;
+                vidout_rgb[15:8]  <= fb_pixel;
+                vidout_rgb[7:0]   <= fb_pixel;
                 
             end 
         end
