@@ -3,7 +3,7 @@
         "magic": "APF_VER_1",
         "metadata": {
             "platform_ids": ["life"],
-            "shortname": "Game of Life",
+            "shortname": "Life",
             "description": "Conway's Game of Life.",
             "author": "ericlewis",
             "url": "https://github.com/ericlewis/analogue-life",
