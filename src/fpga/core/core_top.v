@@ -465,7 +465,7 @@ row row1 (
 
 row row2 (
    .clock(conway_clk),
-   .shiftin(random_data[0]),
+   .shiftin(r3p1),
    .shiftout(pixel_out_row2)                                               
 );
 
