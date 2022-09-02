@@ -438,7 +438,58 @@ core_bridge_cmd icb (
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+// Game of life
 
+reg output_pixel, 
+    r1p1, 
+    r1p2, 
+    r2p1, 
+    r2p2, 
+    r3p1, 
+    r3p2, 
+    sync_wait;
+
+wire pixel_out_row1, 
+     pixel_out_row2, 
+     pixel_out_fifo;
+
+always @(posedge clk_core_12288) begin
+   sync_wait <= (sync_wait & |{x_count, y_count});
+end
+
+row row1 (
+   .clock(conway_clk),
+   .shiftin(r2p1),
+   .shiftout(pixel_out_row1)                                               
+);
+
+row row2 (
+   .clock(conway_clk),
+   .shiftin(random_data[0]),
+   .shiftout(pixel_out_row2)                                               
+);
+
+wire conway_clk = clk_core_12288 & (~sync_wait);
+
+wire [3:0] neighbor_count = r1p1 + r1p2 + pixel_out_row1 + r2p1 + pixel_out_row2 + r3p1 + r3p2 + pixel_out_fifo;
+
+wire [30:0] random_data;
+
+random lfsr(
+   .clock(clk_core_12288),
+   .lfsr(random_data)
+);
+
+always @(posedge conway_clk) begin
+   r1p1 <= r1p2; r1p2 <= pixel_out_row1;
+   r2p1 <= r2p2; r2p2 <= pixel_out_row2;
+   r3p1 <= r3p2; r3p2 <= pixel_out_fifo;
+
+   output_pixel <= r2p2;
+   fb_pixel <= {8{output_pixel}};
+end
+
+reg [7:0] fb_pixel;
 
 // video generation
 // ~12,288,000 hz pixel clock
@@ -611,7 +662,5 @@ mf_pllbase mp1 (
     
     .locked         ( pll_core_locked )
 );
-
-
     
 endmodule
