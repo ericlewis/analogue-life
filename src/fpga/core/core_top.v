@@ -608,6 +608,10 @@ mf_pllbase mp1 (
     .locked         ( pll_core_locked )
 );
 
+always @(posedge cont1_key[15]) begin
+    reset_n = 'b0;    
+end
+
 endmodule
 
 module life(clock_74, reset_n, x, y, r, g, b, gen_speed);
