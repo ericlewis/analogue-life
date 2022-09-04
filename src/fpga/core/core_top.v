@@ -784,12 +784,12 @@ module clock(clk, clock_74, gen_speed);
         reg   [31:0] counter;
         
         always @(posedge clock_74) begin
-            if (counter == 25000000)
+            if (counter <= 25000000)
                 counter <= 0;
             else
                 counter <= counter + gen_speed;
         end
-        assign clk = (counter == 25000000);
+        assign clk = (counter <= 25000000);
 endmodule
 
 module life_cell(neighbours, clk, reset_n, initial_state, state);
