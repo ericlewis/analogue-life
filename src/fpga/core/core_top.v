@@ -826,7 +826,7 @@ module life_cell(neighbours, clk, reset_n, reset_button, initial_state, state);
     assign next_state = (population == 2 & state) | population == 3;
  
     always @(posedge clk or negedge reset_n or posedge reset_button) begin
-        if (~reset_n) begin
+        if (~reset_n or reset_button) begin
             state = initial_state;
         end else begin
             state = next_state;
