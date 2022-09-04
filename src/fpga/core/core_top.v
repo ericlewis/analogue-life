@@ -453,7 +453,7 @@ always @(posedge clk_74a) begin
     reset_button <= 0;
     if (!prev_reset_button && cont1_key[15])
       reset_button <= 1;
-    prev_reset_button = cont1_key[15];
+    prev_reset_button <= cont1_key[15];
 end
 
 life life_instance(
