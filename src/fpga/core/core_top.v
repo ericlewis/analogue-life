@@ -446,9 +446,6 @@ core_bridge_cmd icb (
 ////////////////////////////////////////////////////////////////////////////////////////
 
 reg  [31:0]	gen_speed = 1;
-wire [31:0]	gen_speed_s;
-
-synch_3 #(.WIDTH(32)) s1(gen_speed, gen_speed_s, video_rgb_clock);
 
 life life_instance(
     .clock_74(clk_74a),
@@ -458,7 +455,7 @@ life life_instance(
     .r(video_rgb[23:16]),
     .g(video_rgb[15:8]),
     .b(video_rgb[7:0]),
-    .gen_speed(gen_speed_s),
+    .gen_speed(gen_speed),
 );
 
 // video generation
