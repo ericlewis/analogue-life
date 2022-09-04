@@ -450,6 +450,7 @@ reg  [31:0]	gen_speed = 1;
 life life_instance(
     .clock_74(clk_74a),
     .reset_n(reset_n),
+    .reset_button(cont1_key[15]),
     .x(visible_x),
     .y(visible_y),
     .r(video_rgb[23:16]),
@@ -608,15 +609,12 @@ mf_pllbase mp1 (
     .locked         ( pll_core_locked )
 );
 
-always @(posedge cont1_key[15]) begin
-    reset_n = 'b0;    
-end
-
 endmodule
 
-module life(clock_74, reset_n, x, y, r, g, b, gen_speed);
+module life(clock_74, reset_n, reset_button, x, y, r, g, b, gen_speed);
     input clock_74;
     input reset_n;
+    input reset_button;
     input  [9:0] x, y;
     output [9:0] r, g, b;
     input  [31:0] gen_speed;
@@ -772,7 +770,7 @@ module life(clock_74, reset_n, x, y, r, g, b, gen_speed);
                 assign neighbours[7] = cells[i + 64 + 1];
             end
 
-            life_cell(neighbours, clk, reset_n, cells_reset_state[i], cells[i]);
+            life_cell(neighbours, clk, reset_n, reset_button, cells_reset_state[i], cells[i]);
 
         end
     endgenerate
@@ -796,10 +794,11 @@ module clock(clk, clock_74, gen_speed);
         assign clk = (counter >= 25000000);
 endmodule
 
-module life_cell(neighbours, clk, reset_n, initial_state, state);
+module life_cell(neighbours, clk, reset_n, reset_button, initial_state, state);
     input [7:0] neighbours;
     input clk;
     input reset_n;
+    input reset_button;
     input initial_state;
     output reg state;
  
@@ -817,7 +816,7 @@ module life_cell(neighbours, clk, reset_n, initial_state, state);
     
     assign next_state = (population == 2 & state) | population == 3;
  
-    always @(posedge clk or negedge reset_n) begin
+    always @(posedge clk or negedge reset_n or posedge reset_button) begin
         if (~reset_n) begin
             state = initial_state;
         end else begin
