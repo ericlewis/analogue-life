@@ -446,11 +446,20 @@ core_bridge_cmd icb (
 ////////////////////////////////////////////////////////////////////////////////////////
 
 reg  [31:0]	gen_speed = 1;
+reg reset_button = 0;
+reg prev_reset_button = 0;
+
+always @(posedge clk_74a) begin
+    reset_button <= 0;
+    if (!prev_reset_button && cont1_key[15])
+      reset_button <= 1;
+    prev_reset_button = cont1_key[15];
+end
 
 life life_instance(
     .clock_74(clk_74a),
     .reset_n(reset_n),
-    .reset_button(cont1_key[15]),
+    .reset_button(reset_button),
     .x(visible_x),
     .y(visible_y),
     .r(video_rgb[23:16]),
