@@ -448,7 +448,7 @@ core_bridge_cmd icb (
 reg  [31:0]	gen_speed = 1;
 
 life life_instance(
-    .clock_74(clk_74a),
+    .clock_74(osnotify_inmenu ? 'b0 : clk_74a),
     .reset_n(reset_n),
     .x(visible_x),
     .y(visible_y),
