@@ -477,12 +477,6 @@ always @(posedge clk_74a or negedge reset_n) begin
         savestate_load_ack	    <= 1'b0;
 		savestate_start_ack 	<= 1'b0;
         savestate_load_busy	    <= 1'b0;
-
-        if (bridge_wr) begin
-            case (bridge_addr)
-                // TODO
-            endcase
-        end
     end
 end
 
