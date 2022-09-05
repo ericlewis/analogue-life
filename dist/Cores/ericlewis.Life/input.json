@@ -1,6 +1,12 @@
 {
     "input": {
         "magic": "APF_VER_1",
-        "controllers": []
+        "controllers": [
+            {
+                "id": 0,
+                "name": "Reset",
+                "key": "pad_btn_b"
+            }
+        ]
     }
 }
