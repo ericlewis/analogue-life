@@ -1048,7 +1048,7 @@ module life(clock_74, reset_n, preset_button, x, y, r, g, b, gen_speed);
                 assign neighbours[7] = cells[i + 64 + 1];
             end
 
-            life_cell(neighbours, clk, reset_n, cells_reset_state[i], cells[i]);
+            life_cell(neighbours, clk, preset_button || reset_n, cells_reset_state[i], cells[i]);
 
         end
     endgenerate
