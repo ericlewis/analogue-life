@@ -311,6 +311,12 @@ assign vpll_feed = 1'bZ;
 // add your own devices here
 always @(*) begin
     casex(bridge_addr)
+        32'h2FFFFFF8: begin
+            bridge_rd_data <= 32'h00500002; // size of save state
+        end
+        32'h2FFFFFFC: begin
+            bridge_rd_data <= 32'h12345678; // CRC (not used)
+        end
         32'h00100000: begin
 		    bridge_rd_data <= gen_speed;
 	    end
@@ -415,10 +421,10 @@ core_bridge_cmd icb (
 
     .dataslot_allcomplete   ( dataslot_allcomplete ),
 
-    .savestate_supported    ( savestate_supported ),
-    .savestate_addr         ( savestate_addr ),
-    .savestate_size         ( savestate_size ),
-    .savestate_maxloadsize  ( savestate_maxloadsize ),
+    .savestate_supported    ( 1'b1 ),
+    .savestate_addr         ( 32'h2FFFFFF8 ),
+    .savestate_size         ( 32'h5000 ),
+    .savestate_maxloadsize  ( 32'h5000 ),
 
     .savestate_start        ( savestate_start ),
     .savestate_start_ack    ( savestate_start_ack ),
@@ -454,6 +460,30 @@ always @(posedge clk_74a) begin
     if (!prev_reset_button && cont1_key[5])
       reset_button <= 0;
     prev_reset_button = cont1_key[5];
+end
+
+always @(posedge clk_74a or negedge reset_n) begin
+    if (~reset_n) begin
+        savestate_start_ack 	<= 1'b0;
+		savestate_start_busy    <= 1'b0;
+		savestate_start_ok	    <= 1'b0;
+		savestate_start_err	    <= 1'b0;
+		savestate_load_ack	    <= 1'b0;
+		savestate_load_busy	    <= 1'b0;
+		savestate_load_ok	    <= 1'b0;
+		savestate_load_err	    <= 1'b0;
+    end
+    else begin
+        savestate_load_ack	    <= 1'b0;
+		savestate_start_ack 	<= 1'b0;
+        savestate_load_busy	    <= 1'b0;
+
+        if (bridge_wr) begin
+            case (bridge_addr)
+                // TODO
+            endcase
+        end
+    end
 end
 
 life life_instance(
