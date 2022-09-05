@@ -369,16 +369,16 @@ end
     wire    [31:0]  savestate_maxloadsize;
 
     wire            savestate_start;
-    wire            savestate_start_ack;
-    wire            savestate_start_busy;
-    wire            savestate_start_ok;
-    wire            savestate_start_err;
+    reg             savestate_start_ack;
+    reg             savestate_start_busy;
+    reg             savestate_start_ok;
+    reg             savestate_start_err;
 
     wire            savestate_load;
-    wire            savestate_load_ack;
-    wire            savestate_load_busy;
-    wire            savestate_load_ok;
-    wire            savestate_load_err;
+    reg             savestate_load_ack;
+    reg             savestate_load_busy;
+    reg             savestate_load_ok;
+    reg             savestate_load_err;
     
     wire            osnotify_inmenu;
 
