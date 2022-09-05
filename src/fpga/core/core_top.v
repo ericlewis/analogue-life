@@ -458,7 +458,7 @@ end
 
 life life_instance(
     .clock_74(clk_74a),
-    .reset_n(coin_insert),
+    .reset_n(reset_button),
     .x(visible_x),
     .y(visible_y),
     .r(video_rgb[23:16]),
