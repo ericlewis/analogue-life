@@ -3,14 +3,19 @@
         "magic": "APF_VER_1",
         "controllers": [
             {
-                "id": 0,
-                "name": "Reset",
-                "key": "pad_btn_b"
-            },
-            {
-                "id": 1,
-                "name": "Next Preset",
-                "key": "pad_btn_a"
+                "type": "default",
+                "mappings": [
+                    {
+                        "id": 0,
+                        "name": "Reset",
+                        "key": "pad_btn_b"
+                    },
+                    {
+                        "id": 1,
+                        "name": "Next Preset",
+                        "key": "pad_btn_a"
+                    }
+                ]
             }
         ]
     }

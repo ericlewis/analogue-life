@@ -319,10 +319,10 @@ always @(*) begin
         end
         32'h00100000: begin
 		    bridge_rd_data <= gen_speed;
-		  end
-		  32'h30004000: begin
-		    bridge_rd_data <= cells;
-		  end
+        end
+        32'h30000000: begin
+            bridge_rd_data <= cells_out;
+        end
         32'hF8xxxxxx: begin
             bridge_rd_data <= cmd_bridge_rd_data;
         end
@@ -635,6 +635,9 @@ parameter   idle						= 4'd0,	// I wait
 
 reg [3:0]	save_state_system;
 
+reg [0:64*48-1] cells_out;
+reg [0:64*48-1] cells_in;
+
 always @(posedge clk_74a or negedge reset_n) begin
     if (~reset_n) begin
         savestate_start_ack 	<= 1'b0;
@@ -645,6 +648,7 @@ always @(posedge clk_74a or negedge reset_n) begin
 		savestate_load_busy 	<= 1'b0;
 		savestate_load_ok	    <= 1'b0;
 		savestate_load_err	    <= 1'b0;
+        cells_out               <= 'd0;
     end
     else begin
         savestate_load_ack	    <= 1'b0;
@@ -653,13 +657,13 @@ always @(posedge clk_74a or negedge reset_n) begin
 		
 		if (bridge_wr) begin
 			case (bridge_addr)  
-				32'h30004000: begin
-					cells_preset_loaded <= bridge_wr_data;
+				32'h30000000: begin
+					cells_in <= bridge_wr_data;
 				end
 			endcase
 		end
 
-        case (save_state_system)
+        case(save_state_system)
 			idle : begin
 				if (savestate_start) save_state_system <= save_state_ack;
 				if (savestate_load) save_state_system <= load_state_ack;
@@ -673,6 +677,7 @@ always @(posedge clk_74a or negedge reset_n) begin
 			save_state_wait : begin
 				savestate_start_busy 	<= 1'b1;
 				save_state_system 		<= save_state_process;
+                cells_out <= cells;
 			end
 			save_state_process : begin
                 save_state_system 	    <= save_state_completed;
@@ -722,7 +727,6 @@ life life_instance(
     
 	wire [0:64*48-1] cells;
     reg [0:64*48-1] cells_preset;
-    reg [0:64*48-1] cells_preset_loaded;
     reg [3:0] preset_state;
 
 initial begin
@@ -947,11 +951,6 @@ module life(clock_74, reset_n, x, y, r, g, b, gen_speed, cells_preset, cells);
 	input  [0:64*48-1] cells_preset;
 	inout  [0:64*48-1] cells;
 
-    
-    wire [0:64*48-1] cells_reset_state;
-
-    assign cells_reset_state = cells_preset;
-
     wire clk;
     clock clock_inst(clk, clock_74, gen_speed);
 
@@ -1042,7 +1041,7 @@ module life(clock_74, reset_n, x, y, r, g, b, gen_speed, cells_preset, cells);
                 assign neighbours[7] = cells[i + 64 + 1];
             end
 
-            life_cell life_cell_inst(neighbours, clk, reset_n, cells_reset_state[i], cells[i]);
+            life_cell life_cell_inst(neighbours, clock_74, clk, reset_n, cells_preset[i], cells[i]);
 
         end
     endgenerate
@@ -1066,32 +1065,33 @@ module clock(clk, clock_74, gen_speed);
         assign clk = (counter >= 25000000);
 endmodule
 
-module life_cell(neighbours, clk, reset_n, initial_state, state);
+module life_cell(neighbours, clock_74, enable, reset_n, initial_state, state);
     input [7:0] neighbours;
-    input clk;
+    input clock_74;
+    input enable;
     input reset_n;
     input initial_state;
-    output reg state;
- 
-    wire [3:0] population;
-    wire next_state;
+    output reg [0:64*48-1] state;
 
-    assign population = neighbours[7] + 
-                        neighbours[6] +
-                        neighbours[5] +
-                        neighbours[4] +
-                        neighbours[3] +
-                        neighbours[2] +
-                        neighbours[1] +
-                        neighbours[0];
+    always @(posedge clock_74 or negedge reset_n) begin
+        reg [3:0] population;
+        reg [0:64*48-1] next_state;
+
+        population = neighbours[7] + 
+                     neighbours[6] +
+                     neighbours[5] +
+                     neighbours[4] +
+                     neighbours[3] +
+                     neighbours[2] +
+                     neighbours[1] +
+                     neighbours[0];
     
-    assign next_state = (population == 2 & state) | population == 3;
- 
-    always @(posedge clk or negedge reset_n) begin
+        next_state = (population == 2 & state) | population == 3;
+
         if (~reset_n) begin
-            state = initial_state;
-        end else begin
-            state = next_state;
+            state <= initial_state;
+        end else if (enable) begin
+            state <= next_state;
         end
     end
 endmodule
@@ -1104,9 +1104,9 @@ module draw(cells, x, y, r, g, b);
     reg [29:0] RGB;
     always @(x or y) begin
         if (cells[(y / 10) * 64 + (x / 10)]) begin
-            RGB = 30'b111111111111111111111111111111;
+            RGB <= 30'b111111111111111111111111111111;
         end else begin
-            RGB = 30'b000000000000000000000000000000;
+            RGB <= 30'b000000000000000000000000000000;
         end
     end
 
